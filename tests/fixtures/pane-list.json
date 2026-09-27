@@ -1,0 +1,5 @@
+{"id":"cli:pane:list","result":{"panes":[
+{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"35532a69"},"agent_status":"working","cwd":"/home/dev/sites/shop","focused":true,"foreground_cwd":"/home/dev/sites/shop/web","pane_id":"w1:p1","revision":12,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":50},"tab_id":"w1:t1","terminal_id":"term_65c52cf1","terminal_title":"Working","terminal_title_stripped":"Working","workspace_id":"w1"},
+{"agent_status":"unknown","cwd":"/home/dev/sites/shop","focused":false,"foreground_cwd":null,"pane_id":"w1:p2","revision":3,"tab_id":"w1:t2","terminal_id":"term_2","workspace_id":"w1"},
+{"agent_status":"unknown","cwd":"/home/dev/notes","focused":false,"pane_id":"w2:p1","revision":1,"tab_id":"w2:t1","terminal_id":"term_3","workspace_id":"w2"}
+]}}

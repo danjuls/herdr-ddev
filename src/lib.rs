@@ -2,5 +2,6 @@
 pub mod bins;
 pub mod config;
 pub mod docker;
+pub mod herdr;
 pub mod project;
 pub mod runner;
