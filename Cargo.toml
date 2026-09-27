@@ -9,6 +9,8 @@ repository = "https://github.com/danjuls/herdr-ddev"
 
 [dependencies]
 anyhow = "1"
+crossterm = "0.29"
+ratatui = "0.30"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1"

@@ -35,6 +35,15 @@ mod tests {
         assert!(first.is_some());
         assert!(try_lock(&path).unwrap().is_none());
         drop(first);
-        assert!(try_lock(&path).unwrap().is_some());
+        // Other test threads spawn processes; a child holds a copy of every open file until it
+        // execs (close-on-exec), which can keep the lock alive for a moment after the drop.
+        let freed = (0..100).any(|_| {
+            let got = try_lock(&path).unwrap().is_some();
+            if !got {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            got
+        });
+        assert!(freed, "lock was not released after the holder dropped it");
     }
 }
