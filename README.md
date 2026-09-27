@@ -38,6 +38,8 @@ herdr plugin action invoke danjuls.ddev.configure
 `configure` opens a popup that shows exactly what it will add to `~/.config/herdr/config.toml`
 (the sidebar badge and three keys), asks before writing, keeps a backup, checks the result
 with `herdr config check`, and reloads Herdr. Keys you already use are skipped and listed.
+Its additions go in one marked block at the end of the file, so your comments stay where they
+are.
 `herdr plugin action invoke danjuls.ddev.unconfigure` removes exactly what it added.
 
 ## Keys
