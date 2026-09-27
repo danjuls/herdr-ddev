@@ -209,7 +209,7 @@ is gone, or that is older than 15 minutes, is ignored and removed.
 
 **Notifications** use `herdr notification show "ddev" --body "<project> started"
 --sound done`. Failures use `--sound request` and the first line of ddev's stderr; the full
-output goes to stderr, which Herdr keeps in `herdr plugin log`.
+output goes to `worker.log` in the plugin state dir, because the worker runs detached from Herdr.
 
 ## Open site
 
@@ -288,7 +288,7 @@ An invalid file is reported in a notification once, and defaults are used.
 |-----------|-----------|
 | ddev or docker not found | No badges; actions notify with the config key to set |
 | Docker not running | Badges expire via TTL; ticker backs off 5s to 30s, resets on success |
-| ddev command fails | Notification with the first stderr line; full output in `herdr plugin log` |
+| ddev command fails | Notification with the first stderr line; full output in `worker.log` |
 | Action on a busy project | Refused with "already starting" (or stopping, restarting) |
 | Badge during an action | Busy marker shows `◌ ddev…`; the ticker never overwrites it |
 | Second ticker | Fails to take the lock and exits quietly |
