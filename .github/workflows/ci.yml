@@ -17,3 +17,4 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - run: sh scripts/check-version.sh "$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
