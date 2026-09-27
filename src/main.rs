@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use herdr_ddev::actions::{self, Kind};
 use herdr_ddev::app::App;
 use herdr_ddev::busy::Verb;
-use herdr_ddev::{configure, open, picker, ticker};
+use herdr_ddev::{configure, open, picker, popup, ticker};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -31,7 +31,8 @@ fn run(args: &[String]) -> Result<()> {
             return Ok(());
         }
         ["url"] => {
-            return open::run_url_popup(&std::env::var("HERDR_DDEV_URL").unwrap_or_default());
+            let url = std::env::var("HERDR_DDEV_URL").unwrap_or_default();
+            return popup::run(|| open::run_url_popup(&url));
         }
         _ => {}
     }
@@ -49,9 +50,9 @@ fn run(args: &[String]) -> Result<()> {
             let verb = Verb::parse(verb).with_context(|| format!("unknown verb: {verb}"))?;
             actions::worker(&ctx, verb, Path::new(root), name)
         }
-        ["picker"] => picker::run(&ctx),
-        ["configure"] => configure::run_configure(&ctx),
-        ["unconfigure"] => configure::run_unconfigure(&ctx),
+        ["picker"] => popup::run(|| picker::run(&ctx)),
+        ["configure"] => popup::run(|| configure::run_configure(&ctx)),
+        ["unconfigure"] => popup::run(|| configure::run_unconfigure(&ctx)),
         _ => bail!("{USAGE}"),
     }
 }
