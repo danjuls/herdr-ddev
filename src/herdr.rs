@@ -80,6 +80,29 @@ struct WorkspaceList {
     workspaces: Vec<Workspace>,
 }
 
+#[derive(Deserialize)]
+struct PluginList {
+    plugins: Vec<PluginEntry>,
+}
+
+#[derive(Deserialize)]
+struct PluginEntry {
+    plugin_id: String,
+    #[serde(default)]
+    enabled: bool,
+}
+
+/// Whether `herdr plugin list --json` shows this plugin installed and enabled.
+pub fn parse_plugin_enabled(json: &str) -> Result<bool> {
+    let envelope: Envelope<PluginList> =
+        serde_json::from_str(json).context("unexpected `herdr plugin list` output")?;
+    Ok(envelope
+        .result
+        .plugins
+        .iter()
+        .any(|p| p.plugin_id == PLUGIN_ID && p.enabled))
+}
+
 pub fn parse_pane_list(json: &str) -> Result<Vec<Pane>> {
     let envelope: Envelope<PaneList> =
         serde_json::from_str(json).context("unexpected `herdr pane list` output")?;
@@ -123,6 +146,11 @@ impl<'a> Herdr<'a> {
             bail!("herdr {} failed: {}", args.join(" "), out.stderr.trim());
         }
         Ok(out.stdout)
+    }
+
+    /// Lists every plugin: a filtered list would fail outright once this one is uninstalled.
+    pub fn plugin_enabled(&self) -> Result<bool> {
+        parse_plugin_enabled(&self.call(&["plugin", "list", "--json"])?)
     }
 
     pub fn panes(&self) -> Result<Vec<Pane>> {
@@ -424,5 +452,17 @@ mod tests {
             Output::fail("config: issues found"),
         );
         assert!(!Herdr::new(&fake, "herdr").config_check().unwrap());
+    }
+
+    #[test]
+    fn plugin_enabled_reads_this_plugin_only() {
+        let both = r#"{"result":{"plugins":[
+            {"plugin_id":"persiyanov.reviewr","enabled":true},
+            {"plugin_id":"danjuls.ddev","enabled":false}]}}"#;
+        assert!(!parse_plugin_enabled(both).unwrap());
+        let on = r#"{"result":{"plugins":[{"plugin_id":"danjuls.ddev","enabled":true}]}}"#;
+        assert!(parse_plugin_enabled(on).unwrap());
+        let gone = r#"{"result":{"plugins":[{"plugin_id":"persiyanov.reviewr","enabled":true}]}}"#;
+        assert!(!parse_plugin_enabled(gone).unwrap());
     }
 }

@@ -1,22 +1,18 @@
 //! Keeps each workspace's `$ddev` sidebar badge in step with Docker.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::Path;
-use std::time::{Duration, Instant};
-
-use crate::app::Ctx;
-use crate::docker::{self, Project};
-use crate::herdr::Pane;
-use crate::project::{self, StoppedCache};
-use crate::{badge, busy};
-
-use std::path::PathBuf;
+use std::os::unix::fs::MetadataExt;
+use std::os::unix::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::app::unix_ms;
-use crate::herdr::Sound;
-use crate::{config, lock};
+use crate::app::{Ctx, unix_ms};
+use crate::docker::{self, Project};
+use crate::herdr::{Pane, Sound};
+use crate::project::{self, StoppedCache};
+use crate::{badge, busy, config, lock};
 
 /// How long a badge lives without a refresh, so badges vanish if the ticker dies.
 pub fn ttl(interval: Duration) -> Duration {
@@ -185,6 +181,60 @@ impl<'a> Ticker<'a> {
     }
 }
 
+/// A binary's identity, to notice an upgrade (new inode or mtime) or its removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Stamp {
+    pub inode: u64,
+    pub modified_ns: u128,
+}
+
+pub fn stamp(path: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(path).ok()?;
+    let modified_ns = meta
+        .modified()
+        .ok()?
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    Some(Stamp {
+        inode: meta.ino(),
+        modified_ns,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lifecycle {
+    Continue,
+    Exit(&'static str),
+    /// The binary was replaced: exec the new one so badges keep coming from current code.
+    Reexec,
+}
+
+/// Whether the ticker should keep running. Without this a ticker would outlive `plugin
+/// uninstall`, `disable` or an upgrade until the Herdr server stops. `enabled` is `None` when
+/// it was not checked this tick; `started` is `None` when the binary could not be found.
+pub fn lifecycle(
+    started: Option<&Stamp>,
+    now: Option<&Stamp>,
+    manifest_present: bool,
+    enabled: Option<bool>,
+) -> Lifecycle {
+    if !manifest_present {
+        return Lifecycle::Exit("the plugin's files are gone");
+    }
+    if enabled == Some(false) {
+        return Lifecycle::Exit("the plugin is disabled or no longer installed");
+    }
+    match (started, now) {
+        (Some(_), None) => Lifecycle::Exit("the herdr-ddev binary is gone"),
+        (Some(a), Some(b)) if a != b => Lifecycle::Reexec,
+        _ => Lifecycle::Continue,
+    }
+}
+
+/// Ask Herdr whether the plugin is still enabled every this many ticks (~1 minute at 5s).
+const ENABLED_CHECK_EVERY: u64 = 12;
+
 pub fn lock_path(ctx: &Ctx) -> PathBuf {
     ctx.state_dir.join(format!("ticker-{}.lock", ctx.session))
 }
@@ -220,7 +270,34 @@ pub fn run(ctx: &Ctx, config_error: Option<&str>) -> Result<()> {
     };
     let mut ticker = Ticker::new(ctx, docker);
     let (mut herdr_failures, mut docker_failures) = (0u32, 0u32);
-    loop {
+    let exe = std::env::current_exe().ok();
+    let started = exe.as_deref().and_then(stamp);
+    for round in 0u64.. {
+        let enabled = if round % ENABLED_CHECK_EVERY == 0 {
+            ctx.herdr.plugin_enabled().ok()
+        } else {
+            None
+        };
+        let manifest_present = ctx
+            .plugin_root
+            .as_ref()
+            .is_none_or(|root| root.join("herdr-plugin.toml").is_file());
+        let now = exe.as_deref().and_then(stamp);
+        match lifecycle(started.as_ref(), now.as_ref(), manifest_present, enabled) {
+            Lifecycle::Continue => {}
+            Lifecycle::Exit(why) => {
+                eprintln!("herdr-ddev ticker: stopping, {why}");
+                return Ok(());
+            }
+            Lifecycle::Reexec => {
+                if let Some(exe) = &exe {
+                    // The lock is close-on-exec, so the new binary can take it at once.
+                    let err = std::process::Command::new(exe).arg("ticker").exec();
+                    eprintln!("herdr-ddev ticker: could not restart after an upgrade: {err}");
+                }
+                return Ok(());
+            }
+        }
         match ticker.tick(Instant::now(), unix_ms()) {
             Ok(()) => {
                 herdr_failures = 0;
@@ -241,6 +318,7 @@ pub fn run(ctx: &Ctx, config_error: Option<&str>) -> Result<()> {
         }
         std::thread::sleep(backoff(ctx.interval, docker_failures));
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -660,6 +738,71 @@ mod tests {
             *spawned.borrow(),
             1,
             "a second session must still get a ticker"
+        );
+    }
+
+    #[test]
+    fn lifecycle_exits_when_files_go_and_reexecs_on_upgrade() {
+        let a = Stamp {
+            inode: 1,
+            modified_ns: 10,
+        };
+        let b = Stamp {
+            inode: 2,
+            modified_ns: 10,
+        };
+        assert_eq!(
+            lifecycle(Some(&a), Some(&a), true, Some(true)),
+            Lifecycle::Continue
+        );
+        assert_eq!(lifecycle(Some(&a), Some(&b), true, None), Lifecycle::Reexec);
+        assert!(matches!(
+            lifecycle(Some(&a), None, true, None),
+            Lifecycle::Exit(_)
+        ));
+        assert!(matches!(
+            lifecycle(Some(&a), Some(&a), false, None),
+            Lifecycle::Exit(_)
+        ));
+        assert!(matches!(
+            lifecycle(Some(&a), Some(&a), true, Some(false)),
+            Lifecycle::Exit(_)
+        ));
+        assert_eq!(lifecycle(None, None, true, None), Lifecycle::Continue);
+    }
+
+    #[test]
+    fn stamp_changes_when_the_binary_is_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("herdr-ddev");
+        fs::write(&path, "old").unwrap();
+        let before = stamp(&path).unwrap();
+        let new = dir.path().join(".herdr-ddev.new");
+        fs::write(&new, "new").unwrap();
+        fs::rename(&new, &path).unwrap();
+        assert_ne!(stamp(&path).unwrap(), before);
+        fs::remove_file(&path).unwrap();
+        assert_eq!(stamp(&path), None);
+    }
+
+    #[test]
+    fn run_exits_when_herdr_says_the_plugin_is_disabled() {
+        let w = world();
+        let state = tempfile::tempdir().unwrap();
+        let fake = FakeRunner::new();
+        fake.on(
+            &["herdr", "plugin", "list"],
+            Output::ok(r#"{"result":{"plugins":[{"plugin_id":"danjuls.ddev","enabled":false}]}}"#),
+        );
+        fake.on(&["herdr", "pane", "list"], pane_list(&[("w1", &w.shop)]));
+        fake.on(&["docker"], docker_rows("shop", &w.shop, "running"));
+        fake.on(&["herdr", "workspace", "report-metadata"], Output::ok("{}"));
+        let mut ctx = testing::ctx(&fake, state.path(), &testing::no_spawn);
+        ctx.interval = Duration::from_millis(1);
+        run(&ctx, None).unwrap();
+        assert!(
+            fake.calls_starting_with(&["herdr", "pane", "list"])
+                .is_empty()
         );
     }
 }

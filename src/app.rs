@@ -27,6 +27,8 @@ pub struct Ctx<'a> {
     pub pid_alive: &'a dyn Fn(u32) -> bool,
     /// Which Herdr session this is (from its socket), so each session gets its own ticker.
     pub session: String,
+    /// The installed or linked plugin folder, when Herdr says (`HERDR_PLUGIN_ROOT`).
+    pub plugin_root: Option<PathBuf>,
 }
 
 /// A short, stable, file-name-safe key for a Herdr session: FNV-1a of its socket path, or
@@ -63,6 +65,7 @@ pub struct App {
     pub exe: PathBuf,
     pub pane_id: Option<String>,
     pub session: String,
+    pub plugin_root: Option<PathBuf>,
 }
 
 impl App {
@@ -114,6 +117,7 @@ impl App {
             exe: env::current_exe().context("cannot find the herdr-ddev binary")?,
             pane_id: non_empty("HERDR_PANE_ID"),
             session: session_key(non_empty("HERDR_SOCKET_PATH").as_deref()),
+            plugin_root: dir_var("HERDR_PLUGIN_ROOT"),
         })
     }
 
@@ -142,6 +146,7 @@ impl App {
             spawn,
             pid_alive: &busy::pid_alive,
             session: self.session.clone(),
+            plugin_root: self.plugin_root.clone(),
         }
     }
 }
@@ -180,6 +185,7 @@ pub mod testing {
             spawn,
             pid_alive: &always_alive,
             session: "test".to_string(),
+            plugin_root: None,
         }
     }
 }
