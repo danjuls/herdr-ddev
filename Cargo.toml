@@ -1,0 +1,15 @@
+[package]
+name = "herdr-ddev"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "ddev for Herdr: status badges, start/stop/open from a key, and a project picker"
+license = "MIT"
+repository = "https://github.com/danjuls/herdr-ddev"
+
+[dependencies]
+anyhow = "1"
+
+[profile.release]
+lto = true
+strip = true
