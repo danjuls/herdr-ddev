@@ -1,5 +1,9 @@
 use std::process::ExitCode;
 
+use anyhow::{Result, bail};
+use herdr_ddev::app::App;
+use herdr_ddev::ticker;
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
@@ -11,8 +15,6 @@ fn main() -> ExitCode {
     }
 }
 
-use anyhow::{Result, bail};
-
 const USAGE: &str = concat!(
     "usage: herdr-ddev <ticker [--detach] | action <id> | worker <verb> <root> <name> | ",
     "picker | url | configure | unconfigure | --version>"
@@ -20,11 +22,16 @@ const USAGE: &str = concat!(
 
 fn run(args: &[String]) -> Result<()> {
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    if let ["--version" | "-V"] = args.as_slice() {
+        println!("herdr-ddev {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    let app = App::from_env()?;
+    let spawn = |spawn_args: &[String]| app.spawn(spawn_args);
+    let ctx = app.ctx(&spawn);
     match args.as_slice() {
-        ["--version" | "-V"] => {
-            println!("herdr-ddev {}", env!("CARGO_PKG_VERSION"));
-            Ok(())
-        }
+        ["ticker"] => ticker::run(&ctx, app.config_error.as_deref()),
+        ["ticker", "--detach"] => ticker::ensure_running(&ctx),
         _ => bail!("{USAGE}"),
     }
 }

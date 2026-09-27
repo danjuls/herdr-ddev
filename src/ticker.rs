@@ -10,6 +10,14 @@ use crate::herdr::Pane;
 use crate::project::{self, StoppedCache};
 use crate::{badge, busy};
 
+use std::path::PathBuf;
+
+use anyhow::Result;
+
+use crate::app::unix_ms;
+use crate::herdr::Sound;
+use crate::{config, lock};
+
 /// How long a badge lives without a refresh, so badges vanish if the ticker dies.
 pub fn ttl(interval: Duration) -> Duration {
     (interval * 4).max(Duration::from_secs(20))
@@ -174,6 +182,64 @@ impl<'a> Ticker<'a> {
             }
         }
         Ok(())
+    }
+}
+
+pub fn lock_path(ctx: &Ctx) -> PathBuf {
+    ctx.state_dir.join("ticker.lock")
+}
+
+/// Start a background ticker unless one already runs on this machine.
+pub fn ensure_running(ctx: &Ctx) -> Result<()> {
+    match lock::try_lock(&lock_path(ctx))? {
+        Some(lock) => {
+            drop(lock);
+            (ctx.spawn)(&["ticker".to_string()])
+        }
+        None => Ok(()),
+    }
+}
+
+/// The ticker loop. Exits quietly when another ticker holds the lock, when docker is missing,
+/// and after three failed Herdr calls in a row (the server is gone).
+pub fn run(ctx: &Ctx, config_error: Option<&str>) -> Result<()> {
+    let Some(_lock) = lock::try_lock(&lock_path(ctx))? else {
+        return Ok(());
+    };
+    if let Some(error) = config_error {
+        let body = format!("invalid config, using defaults: {error}");
+        let _ = ctx.herdr.notify(&body, Sound::Request);
+    }
+    let Some(docker) = ctx.docker.clone() else {
+        let file = ctx.config_dir.join(config::FILE_NAME);
+        eprintln!(
+            "herdr-ddev ticker: docker not found; set docker_command in {}",
+            file.display()
+        );
+        return Ok(());
+    };
+    let mut ticker = Ticker::new(ctx, docker);
+    let (mut herdr_failures, mut docker_failures) = (0u32, 0u32);
+    loop {
+        match ticker.tick(Instant::now(), unix_ms()) {
+            Ok(()) => {
+                herdr_failures = 0;
+                docker_failures = 0;
+            }
+            Err(TickError::Docker(err)) => {
+                herdr_failures = 0;
+                docker_failures += 1;
+                eprintln!("herdr-ddev ticker: {err:#}");
+            }
+            Err(TickError::Herdr(err)) => {
+                herdr_failures += 1;
+                eprintln!("herdr-ddev ticker: {err:#}");
+                if herdr_failures >= 3 {
+                    return Ok(());
+                }
+            }
+        }
+        std::thread::sleep(backoff(ctx.interval, docker_failures));
     }
 }
 
@@ -530,5 +596,47 @@ mod tests {
         let ctx = testing::ctx(&fake, state.path(), &testing::no_spawn);
         let result = Ticker::new(&ctx, vec!["docker".into()]).tick(Instant::now(), 1_000_000);
         assert!(matches!(result, Err(TickError::Herdr(_))));
+    }
+
+    #[test]
+    fn ensure_running_spawns_only_when_no_ticker_holds_the_lock() {
+        let state = tempfile::tempdir().unwrap();
+        let fake = FakeRunner::new();
+        let spawned = std::cell::RefCell::new(Vec::new());
+        let spawn = |args: &[String]| -> anyhow::Result<()> {
+            spawned.borrow_mut().push(args.to_vec());
+            Ok(())
+        };
+        let ctx = testing::ctx(&fake, state.path(), &spawn);
+        ensure_running(&ctx).unwrap();
+        assert_eq!(spawned.borrow().as_slice(), [vec!["ticker".to_string()]]);
+        let held = crate::lock::try_lock(&lock_path(&ctx)).unwrap().unwrap();
+        ensure_running(&ctx).unwrap();
+        assert_eq!(spawned.borrow().len(), 1);
+        drop(held);
+    }
+
+    #[test]
+    fn run_exits_quietly_when_another_ticker_holds_the_lock() {
+        let state = tempfile::tempdir().unwrap();
+        let fake = FakeRunner::new();
+        let ctx = testing::ctx(&fake, state.path(), &testing::no_spawn);
+        let _held = crate::lock::try_lock(&lock_path(&ctx)).unwrap().unwrap();
+        run(&ctx, None).unwrap();
+        assert!(fake.calls().is_empty());
+    }
+
+    #[test]
+    fn run_exits_after_three_failed_herdr_calls() {
+        let state = tempfile::tempdir().unwrap();
+        let fake = FakeRunner::new();
+        fake.on(&["herdr"], Output::fail("no server"));
+        let mut ctx = testing::ctx(&fake, state.path(), &testing::no_spawn);
+        ctx.interval = Duration::from_millis(1);
+        run(&ctx, None).unwrap();
+        assert_eq!(
+            fake.calls_starting_with(&["herdr", "pane", "list"]).len(),
+            3
+        );
     }
 }
