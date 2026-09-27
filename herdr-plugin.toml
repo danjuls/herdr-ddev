@@ -1,0 +1,92 @@
+id = "danjuls.ddev"
+name = "ddev"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "ddev status badges, start/stop/open from a key, and a project picker"
+platforms = ["macos", "linux"]
+
+[[build]]
+command = ["sh", "scripts/install.sh"]
+
+[[startup]]
+command = ["bin/herdr-ddev", "ticker", "--detach"]
+
+[[actions]]
+id = "toggle"
+title = "ddev: start/stop project"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "toggle"]
+
+[[actions]]
+id = "start"
+title = "ddev: start project"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "start"]
+
+[[actions]]
+id = "stop"
+title = "ddev: stop project"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "stop"]
+
+[[actions]]
+id = "restart"
+title = "ddev: restart project"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "restart"]
+
+[[actions]]
+id = "open"
+title = "ddev: open site"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "open"]
+
+[[actions]]
+id = "picker"
+title = "ddev: projects"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "picker"]
+
+[[actions]]
+id = "configure"
+title = "ddev: add badge and keys to Herdr config"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "configure"]
+
+[[actions]]
+id = "unconfigure"
+title = "ddev: remove badge and keys from Herdr config"
+contexts = ["global"]
+command = ["bin/herdr-ddev", "action", "unconfigure"]
+
+[[panes]]
+id = "picker"
+title = "ddev projects"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bin/herdr-ddev", "picker"]
+
+[[panes]]
+id = "configure"
+title = "ddev configure"
+placement = "popup"
+width = "80%"
+height = "60%"
+command = ["bin/herdr-ddev", "configure"]
+
+[[panes]]
+id = "unconfigure"
+title = "ddev unconfigure"
+placement = "popup"
+width = "80%"
+height = "60%"
+command = ["bin/herdr-ddev", "unconfigure"]
+
+[[panes]]
+id = "url"
+title = "ddev site URL"
+placement = "popup"
+width = "70%"
+height = 12
+command = ["bin/herdr-ddev", "url"]
