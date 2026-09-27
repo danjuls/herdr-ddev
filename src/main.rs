@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use herdr_ddev::actions::{self, Kind};
 use herdr_ddev::app::App;
 use herdr_ddev::busy::Verb;
-use herdr_ddev::{open, ticker};
+use herdr_ddev::{open, picker, ticker};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -49,6 +49,7 @@ fn run(args: &[String]) -> Result<()> {
             let verb = Verb::parse(verb).with_context(|| format!("unknown verb: {verb}"))?;
             actions::worker(&ctx, verb, Path::new(root), name)
         }
+        ["picker"] => picker::run(&ctx),
         _ => bail!("{USAGE}"),
     }
 }

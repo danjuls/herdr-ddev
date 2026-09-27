@@ -11,6 +11,7 @@ pub mod docker;
 pub mod herdr;
 pub mod lock;
 pub mod open;
+pub mod picker;
 pub mod project;
 pub mod runner;
 pub mod ticker;
