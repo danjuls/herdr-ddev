@@ -25,6 +25,22 @@ pub struct Ctx<'a> {
     /// Starts `herdr-ddev <args>` in the background.
     pub spawn: &'a dyn Fn(&[String]) -> Result<()>,
     pub pid_alive: &'a dyn Fn(u32) -> bool,
+    /// Which Herdr session this is (from its socket), so each session gets its own ticker.
+    pub session: String,
+}
+
+/// A short, stable, file-name-safe key for a Herdr session: FNV-1a of its socket path, or
+/// `default` when Herdr did not say.
+pub fn session_key(socket_path: Option<&str>) -> String {
+    let Some(path) = socket_path.filter(|p| !p.is_empty()) else {
+        return "default".to_string();
+    };
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in path.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 pub fn unix_ms() -> u64 {
@@ -46,6 +62,7 @@ pub struct App {
     pub config_dir: PathBuf,
     pub exe: PathBuf,
     pub pane_id: Option<String>,
+    pub session: String,
 }
 
 impl App {
@@ -96,6 +113,7 @@ impl App {
             config_dir,
             exe: env::current_exe().context("cannot find the herdr-ddev binary")?,
             pane_id: non_empty("HERDR_PANE_ID"),
+            session: session_key(non_empty("HERDR_SOCKET_PATH").as_deref()),
         })
     }
 
@@ -123,6 +141,7 @@ impl App {
             pane_id: self.pane_id.clone(),
             spawn,
             pid_alive: &busy::pid_alive,
+            session: self.session.clone(),
         }
     }
 }
@@ -160,6 +179,23 @@ pub mod testing {
             pane_id: None,
             spawn,
             pid_alive: &always_alive,
+            session: "test".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn session_key_is_stable_file_safe_and_has_a_default() {
+        let key = super::session_key(Some("/Users/x/.config/herdr/herdr.sock"));
+        assert_eq!(
+            key,
+            super::session_key(Some("/Users/x/.config/herdr/herdr.sock"))
+        );
+        assert_ne!(key, super::session_key(Some("/tmp/other.sock")));
+        assert!(key.chars().all(|c| c.is_ascii_hexdigit()), "{key}");
+        assert_eq!(super::session_key(None), "default");
+        assert_eq!(super::session_key(Some("")), "default");
     }
 }

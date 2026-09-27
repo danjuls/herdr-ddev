@@ -186,7 +186,7 @@ impl<'a> Ticker<'a> {
 }
 
 pub fn lock_path(ctx: &Ctx) -> PathBuf {
-    ctx.state_dir.join("ticker.lock")
+    ctx.state_dir.join(format!("ticker-{}.lock", ctx.session))
 }
 
 /// Start a background ticker unless one already runs on this machine.
@@ -637,6 +637,29 @@ mod tests {
         assert_eq!(
             fake.calls_starting_with(&["herdr", "pane", "list"]).len(),
             3
+        );
+    }
+
+    #[test]
+    fn each_herdr_session_gets_its_own_ticker_lock() {
+        let state = tempfile::tempdir().unwrap();
+        let fake = FakeRunner::new();
+        let spawned = std::cell::RefCell::new(0);
+        let spawn = |_: &[String]| -> anyhow::Result<()> {
+            *spawned.borrow_mut() += 1;
+            Ok(())
+        };
+        let mut first = testing::ctx(&fake, state.path(), &spawn);
+        first.session = crate::app::session_key(Some("/tmp/herdr-default.sock"));
+        let mut second = testing::ctx(&fake, state.path(), &spawn);
+        second.session = crate::app::session_key(Some("/tmp/herdr-test.sock"));
+        assert_ne!(lock_path(&first), lock_path(&second));
+        let _held = crate::lock::try_lock(&lock_path(&first)).unwrap().unwrap();
+        ensure_running(&second).unwrap();
+        assert_eq!(
+            *spawned.borrow(),
+            1,
+            "a second session must still get a ticker"
         );
     }
 }
