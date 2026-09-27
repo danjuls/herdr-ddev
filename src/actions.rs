@@ -146,15 +146,16 @@ pub fn open_url(ctx: &Ctx, url: &str) -> Result<()> {
     match open::decide(ctx.open_mode, std::env::consts::OS, &|key| {
         std::env::var(key).ok()
     }) {
+        // Detached: a browser that xdg-open launches would hold our pipes open until it quits.
         Opener::Browser(program) => {
-            let out = ctx
+            match ctx
                 .runner
-                .run(&[program.to_string(), url.to_string()], None)?;
-            if out.success {
-                Ok(())
-            } else {
-                ctx.herdr
-                    .notify(&format!("could not open {url}"), Sound::Request)
+                .spawn_detached(&[program.to_string(), url.to_string()])
+            {
+                Ok(()) => Ok(()),
+                Err(err) => ctx
+                    .herdr
+                    .notify(&format!("could not open {url}: {err:#}"), Sound::Request),
             }
         }
         Opener::Clipboard => ctx.herdr.open_pane("url", &[("HERDR_DDEV_URL", url)]),
@@ -377,14 +378,15 @@ mod tests {
         fake.on(&["herdr", "pane", "current"], pane_json(&shop));
         fake.on(&["docker"], Output::ok(""));
         fake.on(&["ddev", "describe"], Output::ok(DESCRIBE));
-        fake.on(&[opener], Output::ok(""));
         let mut ctx = testing::ctx(&fake, state.path(), &testing::no_spawn);
         ctx.open_mode = OpenMode::Browser;
         run(Kind::Open, &ctx).unwrap();
-        assert_eq!(
-            fake.calls_starting_with(&[opener])[0].argv,
-            [opener, "https://shop.ddev.site"]
+        let call = &fake.calls_starting_with(&[opener])[0];
+        assert!(
+            call.detached,
+            "a newly launched browser must not block the action"
         );
+        assert_eq!(call.argv, [opener, "https://shop.ddev.site"]);
     }
 
     #[test]

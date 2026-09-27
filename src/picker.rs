@@ -329,11 +329,15 @@ fn open_row(ctx: &Ctx, row: &Row) -> String {
     match open::decide(ctx.open_mode, std::env::consts::OS, &|key| {
         std::env::var(key).ok()
     }) {
-        Opener::Browser(program) => match ctx.runner.run(&[program.to_string(), url.clone()], None)
-        {
-            Ok(out) if out.success => format!("opened {url}"),
-            _ => format!("could not open {url}"),
-        },
+        Opener::Browser(program) => {
+            match ctx
+                .runner
+                .spawn_detached(&[program.to_string(), url.clone()])
+            {
+                Ok(()) => format!("opened {url}"),
+                Err(err) => format!("could not open {url}: {err:#}"),
+            }
+        }
         Opener::Clipboard => {
             print!("{}", open::osc52(&url));
             let _ = std::io::Write::flush(&mut std::io::stdout());

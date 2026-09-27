@@ -16,9 +16,10 @@ fn argv(ddev: &[String], args: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// Run `ddev start|stop|restart` in the project root. `Err` only when ddev could not run.
+/// Run `ddev start|stop|restart` in the project root, with no time limit (a first start pulls
+/// images). `Err` only when ddev could not run.
 pub fn run_verb(runner: &dyn Runner, ddev: &[String], root: &Path, verb: Verb) -> Result<Output> {
-    runner.run(&argv(ddev, &[verb.as_str()]), Some(root))
+    runner.run_long(&argv(ddev, &[verb.as_str()]), Some(root))
 }
 
 /// What to show when ddev fails: the first non-empty stderr line, else stdout's, at most
@@ -176,6 +177,10 @@ mod tests {
         let out = run_verb(&fake, &ddev(), Path::new("/w/shop"), Verb::Start).unwrap();
         assert!(out.success);
         let call = &fake.calls()[0];
+        assert!(
+            call.long,
+            "ddev start can take minutes; it must not have a time limit"
+        );
         assert_eq!(call.argv, ["ddev", "start"]);
         assert_eq!(call.cwd.as_deref(), Some(Path::new("/w/shop")));
     }
