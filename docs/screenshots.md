@@ -31,7 +31,14 @@ The demo folders are not git repos, so no branch names show in the sidebar.
 | 2 | `picker.png` | The picker popup with the three demo rows, type and URL, footer help visible | `prefix+shift+e`, type `demo` so only demo projects show, arrow to `acme-shop` |
 | 3 | `starting.png` | A workspace mid-start showing `◌ ddev…` | Focus Blue Harbor, `prefix+shift+s`, capture within the first seconds |
 | 4 | `notification.png` | The "blue-harbor started" notification | Right after shot 3 finishes |
-| 5 | `configure.png` | The configure popup listing its planned changes, before pressing `y` | `herdr plugin action invoke danjuls.ddev.configure` from a pane in the demo session; crop the config path if it shows your username; press `n` |
+| 5 | `configure.png` | Configure listing its planned changes, before answering | Your real config already has the changes, so use a scratch copy in a demo pane (see below); press `n` |
+
+For shot 5, in a pane of the demo session (nothing is written when you answer `n`):
+
+```sh
+herdr --default-config > /tmp/herdr-demo-config.toml
+HERDR_CONFIG_PATH=/tmp/herdr-demo-config.toml ~/Work/herdr-ddev/bin/herdr-ddev configure
+```
 
 Optional: a short GIF of picker -> `enter` jumps to the workspace -> `prefix+shift+s` -> badge
 flips from `○` to `◌` to `●`. Kap or CleanShot can record it; keep it under ~5 MB.
