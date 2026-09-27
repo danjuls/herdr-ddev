@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use herdr_ddev::actions::{self, Kind};
 use herdr_ddev::app::App;
 use herdr_ddev::busy::Verb;
-use herdr_ddev::{open, picker, ticker};
+use herdr_ddev::{configure, open, picker, ticker};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -50,6 +50,8 @@ fn run(args: &[String]) -> Result<()> {
             actions::worker(&ctx, verb, Path::new(root), name)
         }
         ["picker"] => picker::run(&ctx),
+        ["configure"] => configure::run_configure(&ctx),
+        ["unconfigure"] => configure::run_unconfigure(&ctx),
         _ => bail!("{USAGE}"),
     }
 }

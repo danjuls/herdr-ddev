@@ -1,0 +1,22 @@
+onboarding = false
+
+[ui.toast]
+delivery = "system"
+
+[theme]
+name = "catppuccin"
+auto_switch = false
+
+# vim-herdr-navigation: Ctrl+h/j/k/l across Neovim splits and herdr panes
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "navigate left (vim/herdr)"
+
+# reviewr: toggle the diff review pane
+[[keys.command]]
+key = "prefix+d"
+type = "plugin_action"
+command = "persiyanov.reviewr.toggle"
+description = "toggle reviewr diff pane"

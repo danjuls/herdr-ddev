@@ -5,6 +5,7 @@ pub mod badge;
 pub mod bins;
 pub mod busy;
 pub mod config;
+pub mod configure;
 pub mod ddev;
 pub mod detach;
 pub mod docker;
