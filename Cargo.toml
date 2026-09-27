@@ -9,6 +9,8 @@ repository = "https://github.com/danjuls/herdr-ddev"
 
 [dependencies]
 anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "1"
 
 [profile.release]
 lto = true
