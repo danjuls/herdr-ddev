@@ -16,6 +16,14 @@ esac
 
 mkdir -p bin
 
+# Replace bin/herdr-ddev by renaming a finished file over it. Writing into the running
+# binary's file fails on Linux ("Text file busy") and gets it killed on macOS.
+install_binary() {
+  cp "$1" bin/.herdr-ddev.new
+  chmod +x bin/.herdr-ddev.new
+  mv -f bin/.herdr-ddev.new bin/herdr-ddev
+}
+
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | cut -d ' ' -f 1
@@ -32,8 +40,8 @@ if [ -n "$target" ] && command -v curl >/dev/null 2>&1; then
     && curl -fsSL "$base/$archive.sha256" -o "$tmp/$archive.sha256"; then
     expected=$(cut -d ' ' -f 1 "$tmp/$archive.sha256")
     if [ "$expected" = "$(sha256 "$tmp/$archive")" ]; then
-      tar -xzf "$tmp/$archive" -C bin herdr-ddev
-      chmod +x bin/herdr-ddev
+      tar -xzf "$tmp/$archive" -C "$tmp" herdr-ddev
+      install_binary "$tmp/herdr-ddev"
       rm -rf "$tmp"
       echo "herdr-ddev: installed release v$version ($target)"
       exit 0
@@ -45,7 +53,7 @@ fi
 
 if command -v cargo >/dev/null 2>&1; then
   cargo build --release --locked
-  cp target/release/herdr-ddev bin/herdr-ddev
+  install_binary target/release/herdr-ddev
   echo "herdr-ddev: built from source"
   exit 0
 fi
