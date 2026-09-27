@@ -13,7 +13,8 @@ after `sh scripts/install.sh`. Note the Herdr version and machine for each run.
 
 - [ ] A workspace in a running ddev project shows a green `● ddev`
 - [ ] `ddev stop` typed in a shell turns it into a dim `○ ddev` within ~5 seconds
-- [ ] `ddev pause` shows a yellow `◐ ddev`
+- [ ] Stopping only the web container (`docker stop ddev-<project>-web`) shows a yellow `◐ ddev`
+      (ddev 1.25 has no `ddev pause`)
 - [ ] A workspace outside ddev projects shows no badge
 - [ ] Quitting Docker makes badges disappear within ~20 seconds; starting it brings them back
 
