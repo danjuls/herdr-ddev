@@ -3,6 +3,13 @@
 ddev for [Herdr](https://herdr.dev): see which workspace's ddev project is running, start,
 stop and open it from a key, and jump between projects from a picker.
 
+<p>
+  <img src="docs/images/badges.png" width="230"
+       alt="Herdr sidebar: Acme Shop running, Northwind paused, Blue Harbor stopped">
+  <img src="docs/images/starting.png" width="230"
+       alt="The same sidebar while Blue Harbor starts">
+</p>
+
 ## What it does
 
 - **Sidebar badge** on every workspace whose folder is a ddev project:
@@ -21,6 +28,8 @@ stop and open it from a key, and jump between projects from a picker.
 - **Picker** listing every ddev project with its status, type and URL. Enter jumps to the
   project's workspace, or opens a new one there.
 - **Notifications** when an action finishes, with ddev's error when it fails.
+
+  <img src="docs/images/notification.png" width="354" alt="Notification: ddev: blue-harbor started">
 
 ## Requirements
 
@@ -42,6 +51,8 @@ Its additions go in one marked block at the end of the file, so your comments st
 are.
 `herdr plugin action invoke danjuls.ddev.unconfigure` removes exactly what it added.
 
+![configure listing the three keys and the sidebar badge it will add, before asking](docs/images/configure.png)
+
 ## Keys
 
 | Key | Action |
@@ -52,6 +63,8 @@ are.
 
 In the picker: type to filter, arrows or `ctrl+n`/`ctrl+p` to move, `enter` to jump,
 `ctrl+s` start/stop, `ctrl+r` restart, `ctrl+o` open, `esc` to clear the filter and close.
+
+![The picker filtered to three projects: running, stopped and paused, with type and URL](docs/images/picker.png)
 
 Every action can also be bound by hand, for example restart:
 
