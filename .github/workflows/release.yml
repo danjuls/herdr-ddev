@@ -8,7 +8,7 @@ jobs:
   check-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sh scripts/check-version.sh "${GITHUB_REF_NAME#v}"
   build:
     needs: check-version
@@ -21,7 +21,7 @@ jobs:
           - { target: aarch64-unknown-linux-musl, os: ubuntu-latest }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -40,7 +40,7 @@ jobs:
           archive="herdr-ddev-${{ matrix.target }}.tar.gz"
           tar -czf "$archive" -C "target/${{ matrix.target }}/release" herdr-ddev
           shasum -a 256 "$archive" > "$archive.sha256"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             herdr-ddev-${{ matrix.target }}.tar.gz
